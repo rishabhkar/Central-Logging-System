@@ -1,23 +1,35 @@
-# Initialisation configuration for OpenTelemetry Collector
 receivers:
   otlp:
     protocols:
-      grpc:
-        endpoint: 0.0.0.0:4317
       http:
         endpoint: 0.0.0.0:4318
-exporters:
-  # NOTE: Prior to v0.86.0 use `logging` instead of `debug`.
-  otlphttp/logs:
-    endpoint: "http://loki:3100/otlp"
-    tls:
-        insecure: true
-  debug:
-    verbosity: detailed
+      grpc:
+        endpoint: 0.0.0.0:4317
 
-# Define pipelines for traces, metrics, and logs
+processors:
+  resource:
+    attributes:
+      - action: upsert
+        key: service.name
+        value: central-logging-system
+  batch: {}
+
+exporters:
+  otlphttp/grafanaCloudOTLP:
+    endpoint: https://otlp-gateway-prod-gb-south-1.grafana.net/otlp
+    auth:
+      authenticator: basicauth/grafanaCloud
+
+extensions:
+  basicauth/grafanaCloud:
+    client_auth:
+      username: ${env:GRAFANA_CLOUD_STACK_ID}
+      password: ${env:GRAFANA_CLOUD_API_KEY}
+
 service:
+  extensions: [basicauth/grafanaCloud]
   pipelines:
     logs:
       receivers: [otlp]
-      exporters: [otlphttp/logs]
+      processors: [resource, batch]
+      exporters: [otlphttp/grafanaCloudOTLP]
